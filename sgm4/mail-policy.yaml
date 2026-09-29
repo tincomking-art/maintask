@@ -1,0 +1,73 @@
+# sgm4 邮件专用策略组（Mihomo / Clash Meta / Clash Verge Rev）
+#
+# 用法：把下面三段分别合并进 sgm4 当前配置的对应位置，
+# 或在 Clash Verge Rev 里用「扩展配置 / Merge」覆盖。
+#
+# 为什么要单独的策略组：
+#   1. 很多机场节点封禁 SMTP 端口（25/465/587）防止被拿去发垃圾邮件，
+#      Gmail 走通用「Google/节点选择」组时收信（IMAP 993）可能正常，发信却超时。
+#   2. 邮件客户端的 IMAP/SMTP 连接不是 HTTP，普通的 url-test 测速
+#      只证明节点能上网页，不代表邮件端口可用。
+#   3. 单独成组后可以只给邮件挑「放行 SMTP 的节点」，不影响其他流量的分流。
+
+# ---------------------------------------------------------------
+# 1) 嗅探：非 fake-ip 模式下，客户端直接连 IP 时靠 TLS SNI 还原域名，
+#    否则下面的 DOMAIN 规则匹配不到。993/465/995 是直连 TLS，可以嗅探；
+#    587/143 是 STARTTLS，嗅探不到，所以后面还有按端口兜底的规则。
+# ---------------------------------------------------------------
+sniffer:
+  enable: true
+  force-dns-mapping: true
+  parse-pure-ip: true
+  sniff:
+    TLS:
+      ports: [443, 8443, 993, 465, 995]
+    HTTP:
+      ports: [80, 8080-8880]
+      override-destination: true
+
+# ---------------------------------------------------------------
+# 2) 策略组
+#    include-all + filter：自动收纳所有订阅节点；filter 里按需改成
+#    你确认放行 SMTP 的节点关键字（比如机场标注了「SMTP」「家宽」「解锁」）。
+#    type 用 select：邮件长连接频繁切节点会导致客户端反复重新登录，
+#    手动选定一个验证过的节点最稳。
+# ---------------------------------------------------------------
+proxy-groups:
+  - name: 📧 邮件
+    type: select
+    include-all: true
+    filter: "(?i)港|HK|Hong|台|TW|日|JP|新|SG|美|US"
+    exclude-filter: "(?i)剩余|到期|官网|流量|套餐"
+    proxies:
+      - DIRECT
+
+# ---------------------------------------------------------------
+# 3) 规则 —— 必须放在 rules: 的最前面！
+#    规则自上而下首个命中生效，如果前面已有 GEOSITE,google / DOMAIN-SUFFIX,google.com /
+#    GEOIP 之类的规则，Gmail 流量会被它们先吃掉，走不到 📧 邮件。
+# ---------------------------------------------------------------
+rules:
+  # Gmail 收发服务器
+  - DOMAIN,imap.gmail.com,📧 邮件
+  - DOMAIN,smtp.gmail.com,📧 邮件
+  - DOMAIN,pop.gmail.com,📧 邮件
+  - DOMAIN-SUFFIX,googlemail.com,📧 邮件
+  - DOMAIN-SUFFIX,gmail.com,📧 邮件
+  # 网页版与 OAuth 登录（Outlook / Thunderbird / Apple Mail 添加 Gmail 账号时要用）
+  - DOMAIN,mail.google.com,📧 邮件
+  - DOMAIN,accounts.google.com,📧 邮件
+  - DOMAIN,oauth2.googleapis.com,📧 邮件
+  # 国内邮箱保持直连，避免被下面的端口兜底规则拉去走代理
+  - DOMAIN-SUFFIX,qq.com,DIRECT
+  - DOMAIN-SUFFIX,163.com,DIRECT
+  - DOMAIN-SUFFIX,126.com,DIRECT
+  - DOMAIN-SUFFIX,aliyun.com,DIRECT
+  # 端口兜底：STARTTLS(587/143) 或纯 IP 连接无法识别域名时靠端口命中
+  - AND,((NETWORK,TCP),(DST-PORT,993)),📧 邮件
+  - AND,((NETWORK,TCP),(DST-PORT,995)),📧 邮件
+  - AND,((NETWORK,TCP),(DST-PORT,465)),📧 邮件
+  - AND,((NETWORK,TCP),(DST-PORT,587)),📧 邮件
+  - AND,((NETWORK,TCP),(DST-PORT,143)),📧 邮件
+  - AND,((NETWORK,TCP),(DST-PORT,25)),📧 邮件
+  # ↓↓↓ 在这里接上 sgm4 原有的规则 ↓↓↓
