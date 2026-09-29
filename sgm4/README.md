@@ -2,6 +2,8 @@
 
 配置模板：[`mail-policy.yaml`](./mail-policy.yaml)（Mihomo / Clash Meta / Clash Verge Rev）。
 
+> 桌面上频繁闪黑色终端窗口？见 [`silent-tasks/`](./silent-tasks/README.md)：找出弹窗的自动任务并改为后台静默执行。
+
 ## 常见原因（按概率排序）
 
 | # | 现象 | 原因 | 处理 |
